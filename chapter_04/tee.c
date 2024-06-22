@@ -1,0 +1,61 @@
+#include <sys/stat.h>
+#include <ctype.h>
+#include <fcntl.h>
+#include "tlpi_hdr.h"
+
+#define BUF_SIZE 1024
+
+extern int optopt;
+extern int optind;
+extern char* optarg;
+
+int
+main(int argc, char *argv[])
+{
+    int fd;
+    int opt;
+    int read_size;
+    int append_flag;
+    char buf[BUF_SIZE];
+    unsigned char aopt = FALSE;
+    char *filename = NULL;
+    
+    if (argc >= 2 && strcmp(argv[1], "--help") == 0)
+        usageErr("%s [-a] file\n", argv[0]);
+    
+
+    while ((opt = getopt(argc, argv, "a")) != -1) {
+        switch(opt) {
+            case 'a':
+             aopt  = TRUE;
+             break;
+            case '?': usageErr(argv[0], "Unrecognized option", optopt);
+            default:  fatal("Unexpected case in switch()");
+        }
+    }
+
+    append_flag = aopt ? O_APPEND : O_TRUNC;
+
+    
+    filename = optind < argc ? argv[optind] : NULL;
+    
+    if (filename) {
+        fd = open(filename, O_RDWR | O_CREAT | append_flag,
+            S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH); /* rw-rw-rw- */
+        if (fd == -1)
+            errExit("open");
+    }
+
+    while ((read_size = read(STDIN_FILENO, buf, BUF_SIZE)) > 0) {
+        write(STDOUT_FILENO, buf, read_size);
+        if (filename) write(fd, buf, read_size);
+    }
+
+    if (read_size == -1)
+        errExit("read");
+
+    if (close(fd) == -1)
+        errExit("close");
+
+    exit(EXIT_SUCCESS);
+}
