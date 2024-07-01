@@ -1,6 +1,6 @@
 include ../Makefile.inc
 
-EXE = large_file append_beginning atomic_append dedup dup_stat_verifier
+EXE = large_file append_beginning atomic_append dedup dup_stat_verifier vector
 
 all : ${EXE}
 
