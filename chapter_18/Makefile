@@ -1,6 +1,6 @@
 include ../Makefile.inc
 
-GEN_EXE = longrunner chmod_failure myrealpath
+GEN_EXE = longrunner chmod_failure myrealpath list_files list_files_mod getcwd nftw_dir_tree
 
 LINUX_EXE =
 
