@@ -1,0 +1,212 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <errno.h>
+
+#define FTW_F 1     // file
+#define FTW_D 2     // directory
+#define FTW_DNR 3   // directory not readable
+#define FTW_DP 4    // directory post-order
+#define FTW_NS 5    // failed to fetch stats
+#define FTW_SL 6    // symlink
+#define FTW_SLN 7   // symlink referencing nonexistent file
+
+#define FTW_PHYS 0x01  // skip symlinks
+#define FTW_MOUNT 0x02 // don't traverse files cross file-systems
+#define FTW_DEPTH 0x04 // post-order traversal
+
+struct FTW {
+    int base;   // offset of the filename within the path
+    int level;  // depth level within the traversal
+};
+
+typedef int (*nftw_func_t)(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwb);
+
+int nftw(const char *dirpath, nftw_func_t func, int flags);
+
+static int
+nftw_recursive(const char *dirpath, nftw_func_t func, int flags, dev_t base_dev, int level)
+{
+    struct stat statbuf;
+    struct dirent *entry;
+    DIR *dir;
+
+    struct FTW ftwb = {0, level};
+
+    // get stats for the current path (don't follow symlinks, for now...)
+    if (lstat(dirpath, &statbuf) == -1) {
+        // failed to fetch stats
+        return func(dirpath, NULL, FTW_NS, &ftwb);
+    }
+
+    if (S_ISLNK(statbuf.st_mode)) { // symlink
+        if (flags & FTW_PHYS) {
+            // run as a symbolic link without following it
+            return func(dirpath, &statbuf, FTW_SL, &ftwb);
+        } else {
+            // follow the symbolic link
+            struct stat link_statbuf;
+            if (stat(dirpath, &link_statbuf) == -1) {
+                return func(dirpath, &statbuf, FTW_SLN, &ftwb); // run func for broken symlink
+            }
+            // use the stats of the resolved link
+            statbuf = link_statbuf;
+        }
+    }
+
+    if ((flags & FTW_MOUNT) && base_dev != 0 && statbuf.st_dev != base_dev) {
+        // skip files of other file-systems in case FTW_MOUNT is set
+        return 0;
+    }
+
+    // calculate base offset for the current path
+    const char *basename = strrchr(dirpath, '/');
+    ftwb.base = basename ? (basename - dirpath + 1) : 0;
+
+    // If it's a file, apply the callback and return
+    if (!S_ISDIR(statbuf.st_mode)) {
+        return func(dirpath, &statbuf, FTW_F, &ftwb);
+    }
+
+    // pre-order directory traversal if FTW_DEPTH is not set
+    if (!(flags & FTW_DEPTH)) {
+        // run for current dir before traversing children
+        int ret = func(dirpath, &statbuf, FTW_D, &ftwb);
+        if (ret != 0) {
+            return ret;
+        }
+    }
+
+    // open the directory
+    dir = opendir(dirpath);
+    if (dir == NULL) { // current directory isn't readable
+        // run func with "directory not readable" (typeflag set to FTW_DNR)
+        return func(dirpath, NULL, FTW_DNR, &ftwb);
+    }
+
+    // traverse child entries in the directory
+    while ((entry = readdir(dir)) != NULL) {
+        // skip "." and ".."
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        // construct the full path of the entryf
+        char fullpath[PATH_MAX];
+        snprintf(fullpath, PATH_MAX, "%s/%s", dirpath, entry->d_name);
+
+        // traverse into the entry
+        int ret = nftw_recursive(fullpath, func, flags, base_dev ? base_dev : statbuf.st_dev, level + 1);
+        if (ret != 0) { // got non-zero response
+            closedir(dir);
+            return ret; // stop scanning
+        }
+    }
+
+    closedir(dir);
+
+    // post-order directory traversal if FTW_DEPTH is set
+    if (flags & FTW_DEPTH) {
+        return func(dirpath, &statbuf, FTW_DP, &ftwb);
+    }
+
+    return 0;
+}
+
+int
+nftw(const char *dirpath, nftw_func_t func, int flags)
+{
+    dev_t base_dev = 0;
+
+    // get the device id of the starting directory if FTW_MOUNT is set
+    if (flags & FTW_MOUNT) {
+        struct stat statbuf;
+        if (stat(dirpath, &statbuf) < 0) {
+            perror("stat failed");
+            return -1;
+        }
+        base_dev = statbuf.st_dev;
+    }
+
+    return nftw_recursive(dirpath, func, flags, base_dev, 0);
+}
+
+
+/* Example function taken from nftw_dir_tree.c (Listing 18-3) */
+static int                      /* Function called by nftw() */
+dirTree(const char *pathname, const struct stat *sbuf, int type,
+        struct FTW *ftwb)
+{
+    if (type == FTW_NS) {                  /* Could not stat() file */
+        printf("?");
+    } else {
+        switch (sbuf->st_mode & S_IFMT) {  /* Print file type */
+        case S_IFREG:  printf("-"); break;
+        case S_IFDIR:  printf("d"); break;
+        case S_IFCHR:  printf("c"); break;
+        case S_IFBLK:  printf("b"); break;
+        case S_IFLNK:  printf("l"); break;
+        case S_IFIFO:  printf("p"); break;
+        case S_IFSOCK: printf("s"); break;
+        default:       printf("?"); break; /* Should never happen (on Linux) */
+        }
+    }
+
+    printf(" %s  ", (type == FTW_D)  ? "D  " : (type == FTW_DNR) ? "DNR" :
+            (type == FTW_DP) ? "DP " : (type == FTW_F)   ? "F  " :
+            (type == FTW_SL) ? "SL " : (type == FTW_SLN) ? "SLN" :
+            (type == FTW_NS) ? "NS " : "  ");
+
+    if (type != FTW_NS)
+        printf("%7ld ", (long) sbuf->st_ino);
+    else
+        printf("        ");
+
+    printf(" %*s", 4 * ftwb->level, "");        /* Indent suitably */
+    printf("%s\n",  &pathname[ftwb->base]);     /* Print basename */
+    return 0;                                   /* Tell nftw() to continue */
+}
+
+
+static void
+usage_error(const char *progName, const char *msg)
+{
+    if (msg != NULL)
+        fprintf(stderr, "%s\n", msg);
+    
+    fprintf(stderr, "Usage: %s [-d] [-m] [-p] [directory-path]\n", progName);
+    fprintf(stderr, "\t-d Use FTW_DEPTH flag\n");
+    fprintf(stderr, "\t-m Use FTW_MOUNT flag\n");
+    fprintf(stderr, "\t-p Use FTW_PHYS flag\n");
+
+    exit(EXIT_FAILURE);
+}
+
+
+int main(int argc, char *argv[]) {
+    int flags, opt;
+
+    flags = 0;
+    while ((opt = getopt(argc, argv, "dmp")) != -1) {
+        switch (opt) {
+        case 'd': flags |= FTW_DEPTH;   break;
+        case 'm': flags |= FTW_MOUNT;   break;
+        case 'p': flags |= FTW_PHYS;    break;
+        default:  usage_error(argv[0], NULL);
+        }
+    }
+
+    if (argc > optind + 1)
+        usage_error(argv[0], NULL);
+
+    if (nftw((argc > optind) ? argv[optind] : ".", dirTree, flags) == -1) {
+        perror("nftw");
+        exit(EXIT_FAILURE);
+    }
+
+    return EXIT_SUCCESS;
+}
