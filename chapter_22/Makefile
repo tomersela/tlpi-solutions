@@ -1,6 +1,6 @@
 include ../Makefile.inc
 
-GEN_EXE = sigcont sigorder
+GEN_EXE = sigcont sigorder sig_speed_sigsuspend sig_speed_sigsuspend_mod sig_systemv
 
 LINUX_EXE =
 
