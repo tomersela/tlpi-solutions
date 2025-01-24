@@ -1,6 +1,6 @@
 include ../Makefile.inc
 
-GEN_EXE = real_timer alarm t_nanosleep t_nanosleep_mod
+GEN_EXE = real_timer alarm t_nanosleep t_nanosleep_mod null_evp ptmr_sigev_signal ptmr_sigev_signal_mod
 
 LINUX_EXE =
 
