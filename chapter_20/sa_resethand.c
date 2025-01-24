@@ -3,9 +3,6 @@
 #include "tlpi_hdr.h"
 
 
-static volatile sig_atomic_t int_cnt = 0;
-
-
 static void
 handler(int sig)
 {
