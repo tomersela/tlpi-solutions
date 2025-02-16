@@ -1,0 +1,8 @@
+Benchmark results for fork_bench
+---------------------------------
+fork 100000 1782579 -> Elapsed: 29.6903 sec, CPU: 9.48561 sec
+fork 100000 2831155 -> Elapsed: 35.2429 sec, CPU: 11.6757 sec
+fork 100000 12268339 -> Elapsed: 65.1453 sec, CPU: 24.1684 sec
+vfork 100000 1782579 -> Elapsed: 18.6141 sec, CPU: 5.75346 sec
+vfork 100000 2831155 -> Elapsed: 18.4607 sec, CPU: 5.68346 sec
+vfork 100000 12268339 -> Elapsed: 18.2472 sec, CPU: 5.67084 sec
