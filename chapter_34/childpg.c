@@ -1,0 +1,78 @@
+#define _POSIX_C_SOURCE 199309
+#include <signal.h>
+#include <unistd.h>
+
+#include "tlpi_hdr.h"
+#include "ename.c.inc"
+
+
+int
+main(int argc, char *argv[])
+{
+    sigset_t set;
+    siginfo_t info;
+    pid_t pid;
+
+    sigemptyset(&set);
+    sigaddset(&set, SIGUSR1);
+    sigaddset(&set, SIGUSR2);
+    sigprocmask(SIG_BLOCK, &set, NULL);
+
+
+    switch(pid = fork()) {
+        case -1:
+            errExit("fork");
+
+        case 0: // child
+            printf("Child: process pgid before parent change: %d\n", getpgrp());
+
+            kill(getppid(), SIGUSR1);// notify parent we're ready
+            
+            printf("Child: waiting for a parent signal...\n");
+            sigwaitinfo(&set, &info);
+            if (info.si_signo != SIGUSR2) {
+                errExit("Unexpected signal received - %d", info.si_signo);
+            }
+            
+            printf("Child: process pgid after parent change: %d\n", getpgrp());
+            
+            kill(getppid(), SIGUSR1);// notify parent again
+
+            printf("Child: executing sleep...\n");
+            
+            execlp("sleep", "sleep", "10", (char *) NULL);
+            exit(EXIT_SUCCESS);
+
+        default: // parent
+            printf("Parent: waiting for child to get ready\n");
+            sigwaitinfo(&set, &info); // wait for SIGUSR1 from child
+            if (info.si_signo != SIGUSR1) {
+                errExit("Unexpected signal received - %d", info.si_signo);
+            }
+
+            printf("Parent: changing child-process's process group id...\n");
+            if (setpgid(pid, 0) == -1) {
+                printf("errno = %d (%s)\n", errno, ename[errno]);
+            }
+
+            kill(pid, SIGUSR2);
+
+            sigwaitinfo(&set, &info); // wait for SIGUSR1 from child
+            if (info.si_signo != SIGUSR1) {
+                errExit("Unexpected signal received - %d", info.si_signo);
+            }
+
+            printf("Parent: sleeping for 1 second...\n");
+            sleep(1);
+            printf("Parent: trying to change child-process's process group id...\n");
+
+            if (setpgid(pid, 0) == -1) {
+                printf("errno = %d (%s)\n", errno, ename[errno]);
+            }
+
+            break;
+    }
+
+    
+    
+}
