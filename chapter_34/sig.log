@@ -1,0 +1,7 @@
+PID of parent process is:       18984
+Foreground process group ID is: 18984
+PID=18984 PGID=18984
+PID=19213 PGID=18984
+PID=19212 PGID=18984
+PID 19212: caught signal  1 (Hangup)
+PID 19213: caught signal  1 (Hangup)
