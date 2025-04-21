@@ -1,6 +1,6 @@
 include ../Makefile.inc
 
-GEN_EXE = childpg pgleader disc_SIGHUP disc_SIGHUP_mod orphan_read
+GEN_EXE = childpg pgleader disc_SIGHUP disc_SIGHUP_mod orphan_read orphan_pg_sig
 
 LINUX_EXE =
 
