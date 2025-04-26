@@ -1,6 +1,6 @@
 include ../Makefile.inc
 
-GEN_EXE = nice rtsched sched_view
+GEN_EXE = nice rtsched sched_view sched_fifo cpu_affinity
 
 LINUX_EXE =
 
