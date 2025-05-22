@@ -57,7 +57,7 @@ So the SUID bit modification is different, but the system calls made are identic
 | ----------- | --------  | ------------- |
 | **ext4**    | O_APPEND  | YES           |
 | **ext4**    | O_TRUNC   | YES           |
-| **9p**      | O_APPEND  | YES           |
+| **9p**      | O_APPEND  | NO            |
 | **9p**      | O_TRUNC   | YES           |
 
 The issue must be somewhere between the kernel to the 9p server on the host system.
