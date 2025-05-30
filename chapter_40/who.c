@@ -1,0 +1,36 @@
+#define _GNU_SOURCE
+#include <time.h>
+#include <utmpx.h>
+#include <paths.h>
+#include "tlpi_hdr.h"
+
+int
+main(int argc, char *argv[])
+{
+    struct utmpx *ut;
+    
+    // open the utmp file
+    setutxent();
+
+    // read all entries
+    while ((ut = getutxent()) != NULL) {
+        // we're only interested in user processes
+        if (ut->ut_type == USER_PROCESS) {
+            time_t login_time = ut->ut_tv.tv_sec;
+            struct tm *tm = localtime(&login_time);
+            char time_str[20];
+            strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M", tm);
+            
+            printf("%s   %s   %s   %s\n",
+                ut->ut_user,                    // username
+                ut->ut_line,                    // tty
+                ut->ut_host,                    // hostname
+                time_str);                      // login time
+        }
+    }
+
+    // close the utmp file
+    endutxent();
+
+    exit(EXIT_SUCCESS);
+}
