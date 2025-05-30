@@ -1,0 +1,74 @@
+#define _GNU_SOURCE
+#include <utmpx.h>
+#include <pwd.h>
+#include "tlpi_hdr.h"
+
+char *
+getlogin(void)
+{
+    static char username[sizeof(((struct utmpx *)0)->ut_user) + 1];
+    struct utmpx *ut;
+    char *tty;
+    const char *envuser;
+    struct passwd *pw;
+
+    // try utmp database first
+    if (!isatty(STDIN_FILENO)) {
+        errno = ENOTTY;
+        return NULL;
+    }
+
+    tty = ttyname(STDIN_FILENO);
+    if (tty == NULL)
+        return NULL;
+
+    if (strncmp(tty, "/dev/", 5) == 0)
+        tty += 5;
+
+    setutxent();
+    while ((ut = getutxent()) != NULL) {
+        if (ut->ut_type == USER_PROCESS && 
+            strncmp(ut->ut_line, tty, sizeof(ut->ut_line)) == 0) {
+            strncpy(username, ut->ut_user, sizeof(ut->ut_user));
+            username[sizeof(ut->ut_user)] = '\0';
+            endutxent();
+            return username;
+        }
+    }
+    endutxent();
+
+    // try getpwuid
+    pw = getpwuid(getuid());
+    if (pw != NULL && pw->pw_name != NULL) {
+        strncpy(username, pw->pw_name, sizeof(username) - 1);
+        username[sizeof(username) - 1] = '\0';
+        return username;
+    }
+
+    // try LOGNAME environment variable
+    envuser = getenv("LOGNAME");
+    if (envuser == NULL)
+        envuser = getenv("USER");
+    
+    if (envuser != NULL) {
+        strncpy(username, envuser, sizeof(username) - 1);
+        username[sizeof(username) - 1] = '\0';
+        return username;
+    }
+
+    errno = ENOENT;
+    return NULL;
+}
+
+
+int
+main(void)
+{
+    char *login = getlogin();
+    if (login == NULL) {
+        errExit("getlogin");
+        return 1;
+    }
+    printf("%s\n", login);
+    return 0;
+}
