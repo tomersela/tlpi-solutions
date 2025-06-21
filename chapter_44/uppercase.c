@@ -1,0 +1,87 @@
+#include <ctype.h>
+
+#include "tlpi_hdr.h"
+
+
+int
+main(int argc, char *argv[])
+{
+    char *buf;
+    int buf_size;
+    int req_pipe_fd[2];
+    int res_pipe_fd[2];
+
+    buf_size = fpathconf(STDIN_FILENO, _PC_PIPE_BUF);
+    buf = malloc(buf_size);
+
+    ssize_t read_cnt;
+
+    if (pipe(req_pipe_fd) == -1)
+        errExit("pipe(req_pipe_fd)");
+    if (pipe(res_pipe_fd) == -1)
+        errExit("pipe(req_pipe_fd)");
+
+    switch (fork()) {
+        case -1:
+            errExit("fork");
+        case 0: // child
+            
+            // close unused descriptors
+            if (close(req_pipe_fd[1])) // close write end of the request pipe
+                errExit("close(req_pipe_fd[1])");
+            if (close(res_pipe_fd[0])) // close read end of the response pipe
+                errExit("close(res_pipe_fd[0])");
+
+            // continously read from the req_pipe_fd until EOF
+            for (;;) {
+                if ((read_cnt = read(req_pipe_fd[0], buf, buf_size)) == 0) // EOF
+                    break;
+
+                if (read_cnt == -1)
+                    errExit("read (child)");
+
+                for (int i = 0; i < read_cnt; i++)
+                    buf[i] = toupper(buf[i]);
+                
+                // write back to parent
+                if (write(res_pipe_fd[1], buf, read_cnt) != read_cnt)
+                    errExit("partial write or broken pipe (child)");
+            }
+
+            free(buf);
+            exit(EXIT_SUCCESS);
+        default: // parent
+
+            // close unused descriptors
+            if (close(req_pipe_fd[0])) // close read end of the request pipe
+                errExit("close(req_pipe_fd[0])");
+            if (close(res_pipe_fd[1])) // close write end of the response pipe
+                errExit("close(res_pipe_fd[1])");
+            
+            // continously read user input (until EOF) and sent to child process
+            for (;;) {
+                if ((read_cnt = read(STDIN_FILENO, buf, buf_size)) == 0) { // EOF
+                    close(req_pipe_fd[1]); // close write end - signal EOF to child process
+                    break; // exit
+                }
+
+                if (read_cnt == -1)
+                    errExit("read (parent)");
+                
+                // write to child process
+                if (write(req_pipe_fd[1], buf, read_cnt) != read_cnt)
+                    errExit("partial write or broken pipe (parent)");
+
+                // read response from child process
+                if(read(res_pipe_fd[0], buf, read_cnt) != read_cnt)
+                    errExit("partial read or broken pipe (parent)");
+                
+                // write to stdout
+                if (write(STDOUT_FILENO, buf, read_cnt) != read_cnt)
+                    errExit("partial write (parent)");
+            }
+            
+            free(buf);
+            exit(EXIT_SUCCESS);
+    }
+}
