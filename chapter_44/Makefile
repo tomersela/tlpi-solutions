@@ -1,6 +1,6 @@
 include ../Makefile.inc
 
-GEN_EXE = uppercase
+GEN_EXE = uppercase popen
 
 LINUX_EXE =
 
