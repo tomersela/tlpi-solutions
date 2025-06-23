@@ -1,6 +1,6 @@
 include ../Makefile.inc
 
-GEN_EXE = uppercase popen
+GEN_EXE = uppercase popen fifo_seqnum_server fifo_seqnum_client fifo_seqnum_server_mod
 
 LINUX_EXE =
 
