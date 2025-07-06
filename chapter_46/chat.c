@@ -1,0 +1,195 @@
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <sys/stat.h>
+#include <limits.h>
+#include <signal.h>
+#include <time.h>
+#include <pwd.h>
+#include <unistd.h>
+
+#include "tlpi_hdr.h"
+
+#define QUEUE_DIR "/tmp/chat_queues"
+
+struct chat_msg {
+    long mtype;
+    char sender[32];
+    char text[512];
+};
+
+static int my_qid = -1;
+
+static void
+cleanup(void)
+{
+    // remove the queue on exit
+    if (my_qid != -1)
+        msgctl(my_qid, IPC_RMID, NULL);
+}
+
+static void
+handle_sigint(int sig)
+{
+    cleanup();
+    _exit(EXIT_SUCCESS);
+}
+
+static void
+write_queue_file(int qid)
+{
+    // write your queue id to /tmp/chat_queues/<username>
+    char *username = getenv("USER");
+    if (username == NULL || strlen(username) == 0) {
+        struct passwd *pw = getpwuid(geteuid());
+        if (!pw)
+            errExit("getpwuid");
+        username = pw->pw_name;
+    }
+
+    /*
+        create directory with sticky bit like /tmp
+        we create the dir with the sticky bit so:
+        - everyone can write into it
+        - but only the owner of a file can delete or modify their own file
+    */
+    if (mkdir(QUEUE_DIR, S_IRWXU | S_IRWXG | S_IRWXO | S_ISVTX) == -1 && errno != EEXIST)
+        errExit("mkdir chat queue dir");
+
+    chmod(QUEUE_DIR, S_IRWXU | S_IRWXG | S_IRWXO | S_ISVTX); // fix the mode in case umask messed it up
+
+    char path[PATH_MAX];
+    snprintf(path, sizeof(path), "%s/%s", QUEUE_DIR, username);
+
+    FILE *f = fopen(path, "w");
+    if (f == NULL)
+        errExit("fopen chat queue file");
+
+    fprintf(f, "%d\n", qid);
+    fclose(f);
+}
+
+static int
+read_peer_queue_id(const char *username)
+{
+    // read another user's queue id (with retry)
+    char path[PATH_MAX];
+    snprintf(path, sizeof(path), "%s/%s", QUEUE_DIR, username);
+
+    int qid;
+    while (1) {
+        FILE *f = fopen(path, "r");
+        if (f != NULL) {
+            if (fscanf(f, "%d", &qid) == 1) {
+                fclose(f);
+
+                // validate the queue exists before returning
+                struct msqid_ds dummy;
+                if (msgctl(qid, IPC_STAT, &dummy) == -1) {
+                    fprintf(stderr, "peer queue %d is invalid or removed, waiting again...\n", qid);
+                    sleep(1);
+                    continue;
+                }
+
+                return qid;
+            }
+            fclose(f);
+        }
+
+        printf("waiting for %s to appear...\n", username);
+        sleep(1);
+    }
+}
+
+static void
+send_loop(int peer_qid, const char *my_name)
+{
+    struct chat_msg msg;
+    msg.mtype = 1;
+    char buf[512];
+
+    // loop to read from stdin and send messages
+    while (1) {
+        printf("%s > ", my_name);
+        fflush(stdout);
+
+        if (fgets(buf, sizeof(buf), stdin) == NULL)
+            break;
+
+        strncpy(msg.sender, my_name, sizeof(msg.sender) - 1);
+        strncpy(msg.text, buf, sizeof(msg.text) - 1);
+        msg.sender[sizeof(msg.sender) - 1] = '\0';
+        msg.text[sizeof(msg.text) - 1] = '\0';
+
+        if (msgsnd(peer_qid, &msg, sizeof(msg) - sizeof(long), 0) == -1)
+            perror("msgsnd");
+    }
+}
+
+static void
+receive_loop(const char *my_name)
+{
+    struct chat_msg msg;
+    char timebuf[64];
+    time_t now;
+    struct tm *tm_info;
+
+    // loop to receive messages and print them
+    while (1) {
+        if (msgrcv(my_qid, &msg, sizeof(msg) - sizeof(long), 0, 0) == -1)
+            errExit("msgrcv");
+
+        time(&now);
+        tm_info = localtime(&now);
+        strftime(timebuf, sizeof(timebuf), "%H:%M:%S", tm_info);
+        
+        printf("\r\033[2K");
+        printf("[%s] %s: %s", timebuf, msg.sender, msg.text);
+        printf("%s > ", my_name);
+        fflush(stdout);
+    }
+}
+
+int
+main(int argc, char *argv[])
+{
+    if (argc != 3 || strcmp(argv[1], "start") != 0) {
+        fprintf(stderr, "usage: %s start <peer>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
+    const char *peer = argv[2];
+    const char *my_name = getenv("USER");
+    if (!my_name || strlen(my_name) == 0) {
+        struct passwd *pw = getpwuid(geteuid());
+        if (!pw)
+            errExit("getpwuid");
+        my_name = pw->pw_name;
+    }
+
+    // create message queue with read/write for all users
+    my_qid = msgget(IPC_PRIVATE, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+    if (my_qid == -1)
+        errExit("msgget");
+
+    write_queue_file(my_qid);
+    atexit(cleanup);
+
+    // handle ctrl+c or SIGTERM
+    signal(SIGINT, handle_sigint);
+    signal(SIGTERM, handle_sigint);
+
+    int peer_qid = read_peer_queue_id(peer);
+
+    pid_t pid = fork();
+    if (pid == -1)
+        errExit("fork");
+
+    if (pid == 0) {
+        receive_loop(my_name);
+    } else {
+        send_loop(peer_qid, my_name);
+        kill(pid, SIGTERM);
+    }
+
+    return 0;
+}
