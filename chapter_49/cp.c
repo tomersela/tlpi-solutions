@@ -1,0 +1,65 @@
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <ctype.h>
+#include <fcntl.h>
+#include "tlpi_hdr.h"
+
+
+int
+main(int argc, char *argv[])
+{
+    int src_fd, dst_fd;
+    char *src_filename, *dst_filename;
+    void *src_file_content, *dst_file_content;
+    struct stat sb;
+    size_t file_size;
+
+    if (argc < 3 || (argc > 1 && strcmp(argv[1], "--help") == 0))
+        usageErr("%s src_file dst_file\n", argv[0]);
+
+    src_filename = argv[1];
+    dst_filename = argv[2];
+
+    src_fd = open(src_filename, O_RDONLY, 0);
+    if (src_fd == -1)
+        errExit(src_filename);
+
+    // get file size
+    if (fstat(src_fd, &sb) == -1)
+        errExit("stat");
+    file_size = sb.st_size;
+
+    if (file_size == 0)
+        exit(EXIT_SUCCESS);
+
+    if ((src_file_content = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, src_fd, 0)) == MAP_FAILED)
+        errExit("mmap - src_fd");
+
+    dst_fd = open(dst_filename, O_RDWR | O_CREAT | O_TRUNC,
+            S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+    if (dst_fd == -1)
+            errExit("open dst_file");
+
+    // set the size of the target file
+    if (ftruncate(dst_fd, file_size) == -1)
+        errExit("ftruncate");
+    
+    if ((dst_file_content = mmap(NULL, file_size, PROT_READ | PROT_WRITE, MAP_SHARED, dst_fd, 0)) == MAP_FAILED)
+        errExit("mmap - dst_fd");
+    
+    // copy content
+    memcpy(dst_file_content, src_file_content, file_size);
+
+    if (munmap(src_file_content, file_size) == -1)
+        errExit("munmap - src");
+    if (munmap(dst_file_content, file_size) == -1)
+        errExit("munmap - dst");
+
+    if (close(src_fd) == -1)
+        errExit("close");
+    
+    if (close(dst_fd) == -1)
+        errExit("close");
+
+    return EXIT_SUCCESS;
+}
