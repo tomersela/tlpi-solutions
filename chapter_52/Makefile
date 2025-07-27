@@ -3,7 +3,7 @@ include ../Makefile.inc
 GEN_EXE = pmsg_receive pmsg_create pmsg_send pmsg_receive_to \
 			fifo_seqnum_client fifo_seqnum_server pmq_seqnum_client pmq_seqnum_server \
 			svmsg_file_client svmsg_file_server pmq_file_client pmq_file_server \
-			chat
+			chat mq_notify_sig mq_notify_sig_mod
 
 LINUX_EXE =
 
