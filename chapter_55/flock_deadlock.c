@@ -1,0 +1,121 @@
+/* flock_deadlock.c
+
+   Test whether flock() detects deadlock situations when two processes
+   try to lock two different files in opposite orders.
+   
+   Deadlock scenario:
+   - Process A: locks file1, then tries to lock file2
+   - Process B: locks file2, then tries to lock file1
+   
+   This should create a deadlock if flock() doesn't detect it.
+*/
+
+#include <sys/file.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#ifdef __APPLE__
+#include <sys/types.h>
+#include <unistd.h>
+/* macOS defines these in sys/file.h but they may not be visible with strict C99 */
+#ifndef LOCK_SH
+#define LOCK_SH   1    /* shared lock */
+#define LOCK_EX   2    /* exclusive lock */
+#define LOCK_NB   4    /* don't block when locking */
+#define LOCK_UN   8    /* unlock */
+#endif
+/* Function declaration for flock */
+int flock(int fd, int operation);
+#endif
+#include "curr_time.h"
+#include "tlpi_hdr.h"
+
+
+static void
+deadlock_test(const char *first_file, const char *second_file)
+{
+    int fd1, fd2;
+    pid_t pid = getpid();
+    
+    printf("PID %ld: Starting deadlock test - will lock %s then %s at %s\n",
+           (long) pid, first_file, second_file, currTime("%T"));
+    
+    // open both files
+    fd1 = open(first_file, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    if (fd1 == -1)
+        errExit("open %s", first_file);
+        
+    fd2 = open(second_file, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    if (fd2 == -1)
+        errExit("open %s", second_file);
+    
+    // lock first file
+    printf("PID %ld: Requesting lock on %s at %s\n",
+           (long) pid, first_file, currTime("%T"));
+    if (flock(fd1, LOCK_EX) == -1)
+        errExit("flock %s", first_file);
+    printf("PID %ld: Got lock on %s at %s\n",
+           (long) pid, first_file, currTime("%T"));
+    
+    sleep(1);  // give other process time to lock its first file
+    
+    // try to lock second file
+    printf("PID %ld: Requesting lock on %s at %s\n",
+           (long) pid, second_file, currTime("%T"));
+    if (flock(fd2, LOCK_EX) == -1) {
+        if (errno == EDEADLK) {
+            printf("PID %ld: DEADLOCK DETECTED on %s at %s\n",
+                   (long) pid, second_file, currTime("%T"));
+        } else {
+            errExit("flock %s", second_file);
+        }
+    } else {
+        printf("PID %ld: Got lock on %s at %s\n",
+               (long) pid, second_file, currTime("%T"));
+    }
+    
+    printf("PID %ld: Holding locks for 5 seconds...\n", (long) pid);
+    sleep(5);
+    
+    // release locks
+    if (flock(fd1, LOCK_UN) == -1)
+        errExit("unlock %s", first_file);
+    if (flock(fd2, LOCK_UN) == -1)
+        errExit("unlock %s", second_file);
+        
+    printf("PID %ld: Released all locks at %s\n",
+           (long) pid, currTime("%T"));
+    
+    close(fd1);
+    close(fd2);
+}
+
+
+int
+main(int argc, char *argv[])
+{
+    pid_t child_pid;
+    
+    if (argc < 3 || strcmp(argv[1], "--help") == 0)
+        usageErr("%s file1 file2\n", argv[0]);
+    
+    printf("Testing flock() deadlock detection with files: %s and %s\n",
+           argv[1], argv[2]);
+    printf("Starting test at %s\n", currTime("%T"));
+    
+    switch (child_pid = fork()) {
+        case -1:
+            errExit("fork");
+        case 0:    // child process B (reverse order)
+            deadlock_test(argv[2], argv[1]);
+            exit(EXIT_SUCCESS);
+        default:   // parent process A (normal order)
+            deadlock_test(argv[1], argv[2]);
+            // wait for child
+            if (waitpid(child_pid, NULL, 0) == -1)
+                errExit("waitpid");
+            break;
+    }
+    
+    printf("Test completed at %s\n", currTime("%T"));
+    return EXIT_SUCCESS;
+}
