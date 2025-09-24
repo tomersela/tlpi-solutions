@@ -2,7 +2,8 @@ include ../Makefile.inc
 
 GEN_EXE = is_seqnum_sv is_seqnum_cl is_seqnum_sv_mod is_seqnum_cl_mod \
 	is_seqnum_sv_mod2 is_seqnum_cl_mod2 us_xfr_sv us_xfr_cl \
-	us_xfr_sv_mod us_xfr_cl_mod kv_server kv_client
+	us_xfr_sv_mod us_xfr_cl_mod kv_server kv_client \
+	udp_connect_test
 
 EXE = ${GEN_EXE} ${LINUX_EXE}
 
