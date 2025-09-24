@@ -2,7 +2,7 @@ include ../Makefile.inc
 
 GEN_EXE = is_seqnum_sv is_seqnum_cl is_seqnum_sv_mod is_seqnum_cl_mod \
 	is_seqnum_sv_mod2 is_seqnum_cl_mod2 us_xfr_sv us_xfr_cl \
-	us_xfr_sv_mod us_xfr_cl_mod
+	us_xfr_sv_mod us_xfr_cl_mod kv_server kv_client
 
 EXE = ${GEN_EXE} ${LINUX_EXE}
 
@@ -33,6 +33,14 @@ us_xfr_sv_mod us_xfr_cl_mod: unix_sockets.o
 us_xfr_sv_mod.o us_xfr_cl_mod.o : us_xfr.h
 
 unix_sockets.o: unix_sockets.h
+
+kv_store.o: kv_store.h
+
+kv_server: kv_store.o inet_sockets.o
+kv_server.o: kv_proto.h kv_store.h inet_sockets.h
+
+kv_client: inet_sockets.o
+kv_client.o: kv_proto.h inet_sockets.h
 
 clean :
 	${RM} ${EXE} *.o
