@@ -1,0 +1,30 @@
+2391 $ ls -l\r\n
+2450 total 564\r\n
+2453 -rw-rw-r-- 1 tomersela tomersela   698 Oct 18 12:38 01.md\r\n
+2454 -rw-rw-r-- 1 tomersela tomersela  8532 Oct 18 23:20 02.md\r\n
+2455 -rw-rw-r-- 1 tomersela tomersela  7319 Oct 19 00:27 03.md\r\n
+2455 -rw-r--r-- 1 tomersela tomersela   464 Oct 19 00:39 Makefile\r\n
+2456 -rw-r--r-- 1 tomersela tomersela  4387 Oct 18 12:40 pty_fork.c\r\n
+2456 -rw-r--r-- 1 tomersela tomersela  1021 Oct 18 12:40 pty_fork.h\r\n
+2457 -rw-rw-r-- 1 tomersela tomersela  9072 Oct 19 00:24 pty_fork.o\r\n
+2457 -rw-r--r-- 1 tomersela tomersela  2873 Oct 18 12:46 pty_master_open.c\r\n
+2458 -rw-r--r-- 1 tomersela tomersela   933 Oct 18 12:46 pty_master_open.h\r\n
+2458 -rw-rw-r-- 1 tomersela tomersela  5736 Oct 19 00:24 pty_master_open.o\r\n
+2458 -rwxrwxr-x 1 tomersela tomersela 85352 Oct 19 00:24 script\r\n
+2459 -rw-r--r-- 1 tomersela tomersela  4388 Oct 18 12:40 script.c\r\n
+2459 -rwxrwxr-x 1 tomersela tomersela 85288 Oct 19 00:25 script_mod_3\r\n
+2460 -rw-r--r-- 1 tomersela tomersela  5457 Oct 19 00:25 script_mod_3.c\r\n
+2460 -rwxrwxr-x 1 tomersela tomersela 86520 Oct 19 00:24 script_mod_a\r\n
+2460 -rw-r--r-- 1 tomersela tomersela  5123 Oct 18 13:32 script_mod_a.c\r\n
+2461 -rwxrwxr-x 1 tomersela tomersela 88984 Oct 19 00:24 script_mod_b\r\n
+2461 -rw-r--r-- 1 tomersela tomersela  6662 Oct 18 13:56 script_mod_b.c\r\n
+2461 -rwxrwxr-x 1 tomersela tomersela 86256 Oct 19 00:53 script_ts\r\n
+2462 -rw-r--r-- 1 tomersela tomersela  6879 Oct 19 00:53 script_ts.c\r\n
+2462 -rw-r--r-- 1 tomersela tomersela  3141 Oct 18 12:42 tty_functions.c\r\n
+2463 -rw-r--r-- 1 tomersela tomersela   967 Oct 18 12:42 tty_functions.h\r\n
+2463 -rw-rw-r-- 1 tomersela tomersela  5472 Oct 19 00:24 tty_functions.o\r\n
+2463 -rw-rw-r-- 1 tomersela tomersela     9 Oct 19 00:54 typescript\r\n
+2464 -rw-rw-r-- 1 tomersela tomersela    17 Oct 19 00:54 typescript.timed\r\n
+4800 $ date\r\n
+4803 Sun 19 Oct 2025 00:54:07 IDT\r\n
+6982 $ exit\r\n
