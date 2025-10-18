@@ -1,0 +1,11 @@
+Script started on Sat 18 Oct 2025 11:09:48 PM IDT
+$ tput cols
+80
+$ tput lines
+24
+$ tput cols
+103
+$ tput lines
+29
+$ exit
+Script done on Sat 18 Oct 2025 11:10:06 PM IDT
